@@ -1,0 +1,65 @@
+server:
+  listen_addr: ":8080"
+  read_timeout: "5s"
+  write_timeout: "10s"
+  idle_timeout: "60s"
+  max_body_bytes: 1048576
+
+logging:
+  level: "info"
+  format: "json"
+
+woodpecker:
+  public_key_file: "/run/secrets/woodpecker_extension_public_key"
+  netrc:
+    enabled: false
+
+vault:
+  address: "https://vault.sendico.io"
+  namespace: ""
+  auth:
+    method: "approle"
+    mount_path: "approle"
+    role_id_file: "/run/secrets/vault_role_id"
+    secret_id_file: "/run/secrets/vault_secret_id"
+  kv:
+    version: 2
+    mount: "kv"
+  request_timeout: "5s"
+  token_renewal: true
+
+rules:
+  - id: "sendico-main-deploy"
+    repo: "sendico/sendico"
+    events: ["push"]
+    branches: ["main"]
+    allow_pull_requests: false
+    allow_forks: false
+    partial: false
+    secrets:
+      - name: "VAULT_ADDR"
+        path: "cicd/woodpecker/deploy"
+        field: "vault_addr"
+        events: ["push"]
+      - name: "VAULT_APP_ROLE"
+        path: "cicd/woodpecker/deploy"
+        field: "vault_app_role"
+        events: ["push"]
+      - name: "VAULT_SECRET_ID"
+        path: "cicd/woodpecker/deploy"
+        field: "vault_secret_id"
+        events: ["push"]
+
+  - id: "sendico-release-deploy"
+    repo: "sendico/sendico"
+    events: ["tag"]
+    refs: ["refs/tags/v*"]
+    allow_pull_requests: false
+    allow_forks: false
+    partial: false
+    secrets:
+      - name: "RELEASE_TOKEN"
+        path: "cicd/woodpecker/release"
+        field: "release_token"
+        events: ["tag"]
+        images: ["woodpeckerci/plugin-docker-buildx"]

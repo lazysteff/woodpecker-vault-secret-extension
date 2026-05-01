@@ -1,0 +1,16 @@
+services:
+  woodpecker-vault-secret-extension:
+    image: woodpecker-vault-secret-extension:latest
+    restart: unless-stopped
+    environment:
+      CONFIG_FILE: /config/config.yml
+    volumes:
+      - ./config.yml:/config/config.yml:ro
+      - ./secrets:/run/secrets:ro
+    ports:
+      - "127.0.0.1:8080:8080"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
