@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -14,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/config"
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/signature"
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/vault"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/config"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/signature"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/vault"
 	"github.com/yaronf/httpsign"
 )
 
@@ -96,6 +97,14 @@ func TestSecretsEndpointFailures(t *testing.T) {
 			store:       &fakeStore{data: map[string]map[string]any{"p": {"vault_addr": "x"}}},
 			rules:       baseRules,
 			req:         httptest.NewRequest(http.MethodPost, "http://example.test/secrets", bytes.NewReader(body)),
+			want:        http.StatusUnauthorized,
+			wantNoVault: true,
+		},
+		{
+			name:        "upstream advisory signature input",
+			store:       &fakeStore{data: map[string]map[string]any{"p": {"vault_addr": "x"}}},
+			rules:       baseRules,
+			req:         advisorySignatureRequest(t, body),
 			want:        http.StatusUnauthorized,
 			wantNoVault: true,
 		},
@@ -281,6 +290,25 @@ func signedRequest(t *testing.T, priv ed25519.PrivateKey, body []byte) *http.Req
 	req.Header.Set("Signature-Input", sigInput)
 	req.Header.Set("Signature", sig)
 	req.Body = io.NopCloser(bytes.NewReader(body))
+	return req
+}
+
+func advisorySignatureRequest(t *testing.T, body []byte) *http.Request {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "http://example.test/secrets", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	digestBody := io.NopCloser(bytes.NewReader(body))
+	digest, err := httpsign.GenerateContentDigestHeader(&digestBody, []string{httpsign.DigestSha256})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Digest", digest)
+	req.Header.Set("Signature-Input", fmt.Sprintf(
+		`%s=("@request-target" "content-digest" "x";req=1);created=%d;alg="ed25519"`,
+		signature.SignatureName,
+		time.Now().Unix(),
+	))
+	req.Header.Set("Signature", signature.SignatureName+"=:QUFBQQ==:")
 	return req
 }
 

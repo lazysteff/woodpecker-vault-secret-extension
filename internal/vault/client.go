@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/config"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/config"
 )
 
 var ErrUnavailable = errors.New("vault unavailable")

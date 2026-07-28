@@ -85,7 +85,7 @@ func (r Request) RepoForLog() string {
 
 func (r Request) IsPullRequest() bool {
 	event := strings.ToLower(r.Pipeline.Event)
-	return event == "pull_request" || event == "pull-request" || event == "pr"
+	return event == "pull_request" || strings.HasPrefix(event, "pull_request_") || event == "pull-request" || event == "pr"
 }
 
 func (r Request) IsTag() bool {

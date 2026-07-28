@@ -1,9 +1,9 @@
-module github.com/stephan/woodpecker-vault-secret-extension
+module github.com/lazysteff/woodpecker-vault-secret-extension
 
 go 1.25
 
 require (
-	github.com/yaronf/httpsign v0.5.1
+	github.com/yaronf/httpsign v0.5.2
 	gopkg.in/yaml.v3 v3.0.1
 )
 

@@ -10,11 +10,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/config"
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/httpserver"
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/logging"
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/signature"
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/vault"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/config"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/httpserver"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/logging"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/signature"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/vault"
 )
 
 func main() {

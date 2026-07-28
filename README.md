@@ -114,9 +114,9 @@ Repository identity is resolved in this order:
 
 Repository matching is lower-case. Events are exact matches. Branches match `pipeline.branch` for branch-based events. Refs match `pipeline.ref` using glob-style `*` and `?`. Tags are shorthand for `refs/tags/...`.
 
-Pull request secrets are denied by default. Forked requests are denied by default. If fork status cannot be determined on a pull request, the request is treated as forked.
+Pull request secrets are denied by default. The `pull_request` event and every event whose name starts with `pull_request_` are treated as pull-request events. Forked requests are denied by default. If fork status cannot be determined on a pull request, the request is treated as forked. Such a request matches only when both `allow_pull_requests: true` and `allow_forks: true` are configured.
 
-Multiple rules may match. Rules are evaluated in YAML order. Duplicate Woodpecker secret names fail the request with `500` unless `allow_override: true` is explicitly set on the overriding rule.
+Multiple rules may match. Rules are evaluated in YAML order. Duplicate Woodpecker secret names fail the request with `500` unless `allow_override: true` is explicitly set on the later rule producing the replacement. An earlier rule cannot authorize a later replacement.
 
 ## Vault / OpenBao
 

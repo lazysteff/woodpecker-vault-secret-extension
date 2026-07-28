@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/config"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/config"
 )
 
 func TestKV2PathValidation(t *testing.T) {

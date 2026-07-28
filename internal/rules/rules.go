@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/config"
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/woodpecker"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/config"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/woodpecker"
 )
 
 var ErrDuplicateSecretName = errors.New("duplicate secret name")
@@ -46,7 +46,6 @@ func (e Engine) Match(req woodpecker.Request) []Match {
 func CollectSecretRefs(matches []Match) ([]SecretRef, error) {
 	refs := make([]SecretRef, 0)
 	seen := map[string]int{}
-	overridable := map[string]bool{}
 	for _, match := range matches {
 		for _, secret := range match.Rule.Secrets {
 			ref := SecretRef{
@@ -58,15 +57,13 @@ func CollectSecretRefs(matches []Match) ([]SecretRef, error) {
 				Images: clone(secret.Images),
 			}
 			if idx, ok := seen[secret.Name]; ok {
-				if !match.Rule.AllowOverride && !overridable[secret.Name] {
+				if !match.Rule.AllowOverride {
 					return nil, fmt.Errorf("%w: %s", ErrDuplicateSecretName, secret.Name)
 				}
 				refs[idx] = ref
-				overridable[secret.Name] = match.Rule.AllowOverride
 				continue
 			}
 			seen[secret.Name] = len(refs)
-			overridable[secret.Name] = match.Rule.AllowOverride
 			refs = append(refs, ref)
 		}
 	}

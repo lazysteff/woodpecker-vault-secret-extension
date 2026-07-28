@@ -12,11 +12,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/config"
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/rules"
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/signature"
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/vault"
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/woodpecker"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/config"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/rules"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/signature"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/vault"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/woodpecker"
 )
 
 type SecretStore interface {

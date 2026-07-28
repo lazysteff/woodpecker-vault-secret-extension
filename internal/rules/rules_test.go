@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/config"
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/woodpecker"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/config"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/woodpecker"
 )
 
 func TestRuleMatching(t *testing.T) {
@@ -101,7 +101,54 @@ func TestRuleMatching(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "pull request explicitly allowed",
+			name: "pull request closed denied by default",
+			rule: rule(config.RuleConfig{
+				Repo:   "sendico/sendico",
+				Events: []string{"pull_request_closed"},
+			}),
+			req: woodpecker.Request{
+				Repo:     base.Repo,
+				Pipeline: woodpecker.Pipeline{Event: "pull_request_closed", Branch: "feature", Ref: "refs/pull/1/head"},
+			},
+			want: false,
+		},
+		{
+			name: "future pull request event denied by default",
+			rule: rule(config.RuleConfig{
+				Repo:   "sendico/sendico",
+				Events: []string{"pull_request_future_variant"},
+			}),
+			req: woodpecker.Request{
+				Repo:     base.Repo,
+				Pipeline: woodpecker.Pipeline{Event: "pull_request_future_variant", Branch: "feature", Ref: "refs/pull/1/head"},
+			},
+			want: false,
+		},
+		{
+			name: "allow forks alone does not allow pull request",
+			rule: rule(config.RuleConfig{
+				Repo:       "sendico/sendico",
+				Events:     []string{"pull_request"},
+				AllowForks: true,
+			}),
+			req:  mustDecode(t, `{"repo":{"namespace":"sendico","name":"sendico"},"pipeline":{"event":"pull_request","branch":"feature","ref":"refs/pull/1/head","from_fork":true}}`),
+			want: false,
+		},
+		{
+			name: "unknown fork denied when only pull requests allowed",
+			rule: rule(config.RuleConfig{
+				Repo:              "sendico/sendico",
+				Events:            []string{"pull_request"},
+				AllowPullRequests: true,
+			}),
+			req: woodpecker.Request{
+				Repo:     base.Repo,
+				Pipeline: woodpecker.Pipeline{Event: "pull_request", Branch: "feature", Ref: "refs/pull/1/head"},
+			},
+			want: false,
+		},
+		{
+			name: "unknown fork allowed when pull requests and forks enabled",
 			rule: rule(config.RuleConfig{
 				Repo:              "sendico/sendico",
 				Events:            []string{"pull_request"},
@@ -124,6 +171,17 @@ func TestRuleMatching(t *testing.T) {
 			req:  mustDecode(t, `{"repo":{"namespace":"sendico","name":"sendico","fork":true},"pipeline":{"event":"pull_request","branch":"feature","ref":"refs/pull/1/head"}}`),
 			want: false,
 		},
+		{
+			name: "fork allowed when pull requests and forks enabled",
+			rule: rule(config.RuleConfig{
+				Repo:              "sendico/sendico",
+				Events:            []string{"pull_request"},
+				AllowPullRequests: true,
+				AllowForks:        true,
+			}),
+			req:  mustDecode(t, `{"repo":{"namespace":"sendico","name":"sendico"},"pipeline":{"event":"pull_request","branch":"feature","ref":"refs/pull/1/head","from_fork":true}}`),
+			want: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -144,6 +202,11 @@ func TestDuplicateSecretNameAndCasing(t *testing.T) {
 	if !errors.Is(err, ErrDuplicateSecretName) {
 		t.Fatalf("expected duplicate secret error, got %v", err)
 	}
+	matches[0].Rule.AllowOverride = true
+	if _, err := CollectSecretRefs(matches); !errors.Is(err, ErrDuplicateSecretName) {
+		t.Fatalf("earlier rule must not authorize a later override, got %v", err)
+	}
+	matches[0].Rule.AllowOverride = false
 	matches[1].Rule.AllowOverride = true
 	refs, err := CollectSecretRefs(matches)
 	if err != nil {

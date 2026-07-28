@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/signature"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/signature"
 )
 
 func TestLoadConfigEnvExpansionAndDefaults(t *testing.T) {

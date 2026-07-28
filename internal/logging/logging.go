@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/stephan/woodpecker-vault-secret-extension/internal/config"
+	"github.com/lazysteff/woodpecker-vault-secret-extension/internal/config"
 )
 
 func New(cfg config.LoggingConfig) *slog.Logger {

@@ -15,7 +15,7 @@ FROM gcr.io/distroless/static-debian12:nonroot
 
 LABEL org.opencontainers.image.title="woodpecker-vault-secret-extension" \
       org.opencontainers.image.description="Woodpecker CI secret extension backed by HashiCorp Vault or OpenBao KV v2" \
-      org.opencontainers.image.source="https://github.com/stephan/woodpecker-vault-secret-extension" \
+      org.opencontainers.image.source="https://github.com/lazysteff/woodpecker-vault-secret-extension" \
       org.opencontainers.image.licenses="Apache-2.0"
 
 ENV CONFIG_FILE=/config/config.yml

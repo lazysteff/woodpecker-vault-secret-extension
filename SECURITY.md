@@ -14,7 +14,7 @@ Operational requirements:
 - Keep the service on a private network path reachable only from Woodpecker.
 - Do not disable signature verification; production builds do not provide a disable flag.
 - Use minimal Vault policies scoped to exact `kv/data/...` paths.
-- Do not enable pull request or fork secrets for public repositories unless the risk is fully understood.
+- Do not enable pull request or fork secrets for public repositories unless the risk is fully understood. The `pull_request` event and all `pull_request_*` variants are subject to the same restrictions, and forked or unknown-fork requests require both pull-request and fork access to be enabled.
 - Do not enable netrc forwarding in v1.
 - Rotate Vault tokens, AppRole Secret IDs, and the Woodpecker extension signing key after suspected exposure.
 
