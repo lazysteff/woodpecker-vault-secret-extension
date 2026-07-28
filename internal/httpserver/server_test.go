@@ -142,6 +142,14 @@ func TestSecretsEndpointFailures(t *testing.T) {
 			want:  http.StatusNoContent,
 		},
 		{
+			name:        "inconsistent event and ref",
+			store:       &fakeStore{data: map[string]map[string]any{"p": {"vault_addr": "x"}}},
+			rules:       baseRules,
+			req:         signedRequest(t, priv, []byte(`{"repo":{"namespace":"sendico","name":"sendico"},"pipeline":{"event":"push","branch":"main","ref":"refs/tags/v1.2.3"}}`)),
+			want:        http.StatusNoContent,
+			wantNoVault: true,
+		},
+		{
 			name:  "malformed json after valid signature",
 			store: &fakeStore{data: map[string]map[string]any{"p": {"vault_addr": "x"}}},
 			rules: baseRules,

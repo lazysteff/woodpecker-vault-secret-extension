@@ -89,6 +89,32 @@ func TestRuleMatching(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "push event with tag ref is denied",
+			rule: rule(config.RuleConfig{
+				Repo:     "sendico/sendico",
+				Events:   []string{"push"},
+				Branches: []string{"main"},
+			}),
+			req: woodpecker.Request{
+				Repo:     base.Repo,
+				Pipeline: woodpecker.Pipeline{Event: "push", Branch: "main", Ref: "refs/tags/v2.0.0"},
+			},
+			want: false,
+		},
+		{
+			name: "tag event with branch ref is denied",
+			rule: rule(config.RuleConfig{
+				Repo:   "sendico/sendico",
+				Events: []string{"tag"},
+				Tags:   []string{"v*"},
+			}),
+			req: woodpecker.Request{
+				Repo:     base.Repo,
+				Pipeline: woodpecker.Pipeline{Event: "tag", Branch: "main", Ref: "refs/heads/main"},
+			},
+			want: false,
+		},
+		{
 			name: "pull request denied by default",
 			rule: rule(config.RuleConfig{
 				Repo:   "sendico/sendico",

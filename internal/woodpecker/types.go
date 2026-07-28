@@ -89,7 +89,11 @@ func (r Request) IsPullRequest() bool {
 }
 
 func (r Request) IsTag() bool {
-	return strings.EqualFold(r.Pipeline.Event, "tag") || strings.HasPrefix(r.Pipeline.Ref, "refs/tags/")
+	return strings.EqualFold(r.Pipeline.Event, "tag")
+}
+
+func (r Request) TagMetadataConsistent() bool {
+	return r.IsTag() == strings.HasPrefix(r.Pipeline.Ref, "refs/tags/")
 }
 
 func (r Request) ForkStatus() (forked bool, known bool) {
