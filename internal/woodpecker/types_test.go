@@ -26,3 +26,26 @@ func TestIsPullRequest(t *testing.T) {
 		})
 	}
 }
+
+func TestTagMetadataConsistent(t *testing.T) {
+	tests := []struct {
+		name  string
+		event string
+		ref   string
+		want  bool
+	}{
+		{name: "tag event and ref", event: "tag", ref: "refs/tags/v1.2.3", want: true},
+		{name: "push event and branch ref", event: "push", ref: "refs/heads/main", want: true},
+		{name: "tag event with branch ref", event: "tag", ref: "refs/heads/main", want: false},
+		{name: "push event with tag ref", event: "push", ref: "refs/tags/v1.2.3", want: false},
+		{name: "tag event without ref", event: "tag", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := Request{Pipeline: Pipeline{Event: tt.event, Ref: tt.ref}}
+			if got := req.TagMetadataConsistent(); got != tt.want {
+				t.Fatalf("TagMetadataConsistent()=%v want=%v", got, tt.want)
+			}
+		})
+	}
+}

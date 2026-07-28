@@ -75,6 +75,9 @@ func matchRule(rule config.RuleConfig, req woodpecker.Request) bool {
 	if !ok || repo != strings.ToLower(rule.Repo) {
 		return false
 	}
+	if !req.TagMetadataConsistent() {
+		return false
+	}
 	if len(rule.Events) > 0 && !containsExact(rule.Events, req.Pipeline.Event) {
 		return false
 	}
