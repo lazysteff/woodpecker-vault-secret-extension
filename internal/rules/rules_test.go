@@ -115,6 +115,19 @@ func TestRuleMatching(t *testing.T) {
 			want: false,
 		},
 		{
+			name: "release event may target tag ref",
+			rule: rule(config.RuleConfig{
+				Repo:   "sendico/sendico",
+				Events: []string{"release"},
+				Refs:   []string{"refs/tags/v*"},
+			}),
+			req: woodpecker.Request{
+				Repo:     base.Repo,
+				Pipeline: woodpecker.Pipeline{Event: "release", Ref: "refs/tags/v2.0.0"},
+			},
+			want: true,
+		},
+		{
 			name: "pull request denied by default",
 			rule: rule(config.RuleConfig{
 				Repo:   "sendico/sendico",
