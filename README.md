@@ -112,7 +112,7 @@ Repository identity is resolved in this order:
 2. `repo.slug`
 3. `repo.namespace + "/" + repo.name`
 
-Repository matching is lower-case. Events are exact matches. Branches match `pipeline.branch` for branch-based events. Refs match `pipeline.ref` using glob-style `*` and `?`. Tags are shorthand for `refs/tags/...`. A tag event must carry a `refs/tags/...` ref, and a non-tag event must not; inconsistent event/ref metadata is denied before rule matching.
+Repository matching is lower-case. Events are exact matches. Branches match `pipeline.branch` for branch-based events. Refs match `pipeline.ref` using glob-style `*` and `?`. Tags are shorthand for `refs/tags/...`. A tag event must carry a `refs/tags/...` ref, while push and pull-request events must not; inconsistent event/ref metadata is denied before rule matching. Other event types can legitimately target a tag and remain governed by their configured event and ref rules.
 
 Pull request secrets are denied by default. The `pull_request` event and every event whose name starts with `pull_request_` are treated as pull-request events. Forked requests are denied by default. If fork status cannot be determined on a pull request, the request is treated as forked. Such a request matches only when both `allow_pull_requests: true` and `allow_forks: true` are configured.
 

@@ -27,7 +27,7 @@ func TestIsPullRequest(t *testing.T) {
 	}
 }
 
-func TestTagMetadataConsistent(t *testing.T) {
+func TestEventRefConsistent(t *testing.T) {
 	tests := []struct {
 		name  string
 		event string
@@ -38,13 +38,16 @@ func TestTagMetadataConsistent(t *testing.T) {
 		{name: "push event and branch ref", event: "push", ref: "refs/heads/main", want: true},
 		{name: "tag event with branch ref", event: "tag", ref: "refs/heads/main", want: false},
 		{name: "push event with tag ref", event: "push", ref: "refs/tags/v1.2.3", want: false},
+		{name: "pull request with tag ref", event: "pull_request", ref: "refs/tags/v1.2.3", want: false},
 		{name: "tag event without ref", event: "tag", want: false},
+		{name: "release event with tag ref", event: "release", ref: "refs/tags/v1.2.3", want: true},
+		{name: "manual event with tag ref", event: "manual", ref: "refs/tags/v1.2.3", want: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := Request{Pipeline: Pipeline{Event: tt.event, Ref: tt.ref}}
-			if got := req.TagMetadataConsistent(); got != tt.want {
-				t.Fatalf("TagMetadataConsistent()=%v want=%v", got, tt.want)
+			if got := req.EventRefConsistent(); got != tt.want {
+				t.Fatalf("EventRefConsistent()=%v want=%v", got, tt.want)
 			}
 		})
 	}
