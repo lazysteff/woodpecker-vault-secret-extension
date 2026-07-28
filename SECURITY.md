@@ -15,7 +15,7 @@ Operational requirements:
 - Do not disable signature verification; production builds do not provide a disable flag.
 - Use minimal Vault policies scoped to exact `kv/data/...` paths.
 - Do not enable pull request or fork secrets for public repositories unless the risk is fully understood. The `pull_request` event and all `pull_request_*` variants are subject to the same restrictions, and forked or unknown-fork requests require both pull-request and fork access to be enabled.
-- Treat contradictory pipeline metadata as unauthorized. Tag events require `refs/tags/...` refs, while push and pull-request events must not carry them. Other event types remain governed by their configured event and ref rules.
+- Treat contradictory pipeline metadata as unauthorized. Tag events require `refs/tags/...` refs, pushes require a non-empty branch and its matching `refs/heads/<branch>` ref, and pull-request events must not carry tag refs. Conflicting or invalid fork indicators cannot establish non-fork status. Other event types remain governed by their configured event and ref rules.
 - Do not enable netrc forwarding in v1.
 - Rotate Vault tokens, AppRole Secret IDs, and the Woodpecker extension signing key after suspected exposure.
 
