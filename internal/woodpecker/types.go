@@ -97,32 +97,40 @@ func (r Request) EventRefConsistent() bool {
 	if r.IsTag() {
 		return tagRef
 	}
-	if strings.EqualFold(r.Pipeline.Event, "push") || r.IsPullRequest() {
+	if strings.EqualFold(r.Pipeline.Event, "push") {
+		const branchRefPrefix = "refs/heads/"
+		return r.Pipeline.Branch != "" &&
+			strings.HasPrefix(r.Pipeline.Ref, branchRefPrefix) &&
+			strings.TrimPrefix(r.Pipeline.Ref, branchRefPrefix) == r.Pipeline.Branch
+	}
+	if r.IsPullRequest() {
 		return !tagRef
 	}
 	return true
 }
 
 func (r Request) ForkStatus() (forked bool, known bool) {
+	foundFalse := false
+	foundInvalid := false
 	for _, raw := range []map[string]any{r.rawPipe, r.rawRepo, r.Raw} {
-		if v, ok := lookupBool(raw, "fork", "forked", "is_fork", "from_fork"); ok {
-			return v, true
+		for _, name := range []string{"fork", "forked", "is_fork", "from_fork"} {
+			value, exists := raw[name]
+			if !exists {
+				continue
+			}
+			valueBool, ok := value.(bool)
+			if !ok {
+				foundInvalid = true
+				continue
+			}
+			if valueBool {
+				return true, true
+			}
+			foundFalse = true
 		}
 	}
-	return false, false
-}
-
-func lookupBool(raw map[string]any, names ...string) (bool, bool) {
-	if raw == nil {
+	if foundInvalid || !foundFalse {
 		return false, false
 	}
-	for _, name := range names {
-		if v, ok := raw[name]; ok {
-			b, ok := v.(bool)
-			if ok {
-				return b, true
-			}
-		}
-	}
-	return false, false
+	return false, true
 }

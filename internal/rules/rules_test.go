@@ -102,6 +102,19 @@ func TestRuleMatching(t *testing.T) {
 			want: false,
 		},
 		{
+			name: "push branch and ref disagreement is denied",
+			rule: rule(config.RuleConfig{
+				Repo:     "sendico/sendico",
+				Events:   []string{"push"},
+				Branches: []string{"main"},
+			}),
+			req: woodpecker.Request{
+				Repo:     base.Repo,
+				Pipeline: woodpecker.Pipeline{Event: "push", Branch: "main", Ref: "refs/heads/feature"},
+			},
+			want: false,
+		},
+		{
 			name: "tag event with branch ref is denied",
 			rule: rule(config.RuleConfig{
 				Repo:   "sendico/sendico",
@@ -208,6 +221,16 @@ func TestRuleMatching(t *testing.T) {
 				AllowPullRequests: true,
 			}),
 			req:  mustDecode(t, `{"repo":{"namespace":"sendico","name":"sendico","fork":true},"pipeline":{"event":"pull_request","branch":"feature","ref":"refs/pull/1/head"}}`),
+			want: false,
+		},
+		{
+			name: "contradictory fork signals are denied",
+			rule: rule(config.RuleConfig{
+				Repo:              "sendico/sendico",
+				Events:            []string{"pull_request"},
+				AllowPullRequests: true,
+			}),
+			req:  mustDecode(t, `{"repo":{"namespace":"sendico","name":"sendico","fork":true},"pipeline":{"event":"pull_request","branch":"feature","ref":"refs/pull/1/head","from_fork":false}}`),
 			want: false,
 		},
 		{

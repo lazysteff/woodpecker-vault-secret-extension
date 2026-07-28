@@ -150,6 +150,28 @@ func TestSecretsEndpointFailures(t *testing.T) {
 			wantNoVault: true,
 		},
 		{
+			name:        "inconsistent push branch and ref",
+			store:       &fakeStore{data: map[string]map[string]any{"p": {"vault_addr": "x"}}},
+			rules:       baseRules,
+			req:         signedRequest(t, priv, []byte(`{"repo":{"namespace":"sendico","name":"sendico"},"pipeline":{"event":"push","branch":"main","ref":"refs/heads/feature"}}`)),
+			want:        http.StatusNoContent,
+			wantNoVault: true,
+		},
+		{
+			name:  "contradictory fork signals",
+			store: &fakeStore{data: map[string]map[string]any{"p": {"vault_addr": "x"}}},
+			rules: []config.RuleConfig{{
+				ID:                "pull-request",
+				Repo:              "sendico/sendico",
+				Events:            []string{"pull_request"},
+				AllowPullRequests: true,
+				Secrets:           []config.SecretConfig{{Name: "VAULT_ADDR", Path: "p", Field: "vault_addr"}},
+			}},
+			req:         signedRequest(t, priv, []byte(`{"repo":{"namespace":"sendico","name":"sendico","fork":true},"pipeline":{"event":"pull_request","branch":"feature","ref":"refs/pull/1/head","from_fork":false}}`)),
+			want:        http.StatusNoContent,
+			wantNoVault: true,
+		},
+		{
 			name:  "malformed json after valid signature",
 			store: &fakeStore{data: map[string]map[string]any{"p": {"vault_addr": "x"}}},
 			rules: baseRules,
