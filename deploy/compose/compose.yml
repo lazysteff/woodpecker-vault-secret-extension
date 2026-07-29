@@ -1,6 +1,7 @@
 services:
   woodpecker-vault-secret-extension:
     image: woodpecker-vault-secret-extension:latest
+    pull_policy: always
     restart: unless-stopped
     environment:
       CONFIG_FILE: /config/config.yml

@@ -10,7 +10,7 @@ import (
 
 func TestRuleMatching(t *testing.T) {
 	base := woodpecker.Request{
-		Repo: woodpecker.Repo{Namespace: "Sendico", Name: "Sendico"},
+		Repo: woodpecker.Repo{Namespace: "Example", Name: "Repo"},
 		Pipeline: woodpecker.Pipeline{
 			Event:  "push",
 			Branch: "main",
@@ -26,7 +26,7 @@ func TestRuleMatching(t *testing.T) {
 		{
 			name: "repo event branch match",
 			rule: rule(config.RuleConfig{
-				Repo:     "sendico/sendico",
+				Repo:     "example/repo",
 				Events:   []string{"push"},
 				Branches: []string{"main"},
 			}),
@@ -36,16 +36,28 @@ func TestRuleMatching(t *testing.T) {
 		{
 			name: "event mismatch",
 			rule: rule(config.RuleConfig{
-				Repo:   "sendico/sendico",
+				Repo:   "example/repo",
 				Events: []string{"tag"},
 			}),
 			req:  base,
 			want: false,
 		},
 		{
+			name: "conflicting repository identities are denied",
+			rule: rule(config.RuleConfig{
+				Repo:   "example/repo",
+				Events: []string{"push"},
+			}),
+			req: woodpecker.Request{
+				Repo:     woodpecker.Repo{FullName: "example/repo", Owner: "other", Name: "repo"},
+				Pipeline: base.Pipeline,
+			},
+			want: false,
+		},
+		{
 			name: "branch mismatch",
 			rule: rule(config.RuleConfig{
-				Repo:     "sendico/sendico",
+				Repo:     "example/repo",
 				Events:   []string{"push"},
 				Branches: []string{"release"},
 			}),
@@ -55,7 +67,7 @@ func TestRuleMatching(t *testing.T) {
 		{
 			name: "ref glob match",
 			rule: rule(config.RuleConfig{
-				Repo: "sendico/sendico",
+				Repo: "example/repo",
 				Refs: []string{"refs/heads/ma*"},
 			}),
 			req:  base,
@@ -64,7 +76,7 @@ func TestRuleMatching(t *testing.T) {
 		{
 			name: "tag shorthand matches ref",
 			rule: rule(config.RuleConfig{
-				Repo:   "sendico/sendico",
+				Repo:   "example/repo",
 				Events: []string{"tag"},
 				Tags:   []string{"v*"},
 			}),
@@ -75,9 +87,22 @@ func TestRuleMatching(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "empty tag name is denied before glob matching",
+			rule: rule(config.RuleConfig{
+				Repo:   "example/repo",
+				Events: []string{"tag"},
+				Tags:   []string{"*"},
+			}),
+			req: woodpecker.Request{
+				Repo:     base.Repo,
+				Pipeline: woodpecker.Pipeline{Event: "tag", Ref: "refs/tags/"},
+			},
+			want: false,
+		},
+		{
 			name: "tag rule does not select by branch",
 			rule: rule(config.RuleConfig{
-				Repo:     "sendico/sendico",
+				Repo:     "example/repo",
 				Events:   []string{"tag"},
 				Branches: []string{"main"},
 				Tags:     []string{"v*"},
@@ -91,7 +116,7 @@ func TestRuleMatching(t *testing.T) {
 		{
 			name: "push event with tag ref is denied",
 			rule: rule(config.RuleConfig{
-				Repo:     "sendico/sendico",
+				Repo:     "example/repo",
 				Events:   []string{"push"},
 				Branches: []string{"main"},
 			}),
@@ -104,7 +129,7 @@ func TestRuleMatching(t *testing.T) {
 		{
 			name: "push branch and ref disagreement is denied",
 			rule: rule(config.RuleConfig{
-				Repo:     "sendico/sendico",
+				Repo:     "example/repo",
 				Events:   []string{"push"},
 				Branches: []string{"main"},
 			}),
@@ -117,7 +142,7 @@ func TestRuleMatching(t *testing.T) {
 		{
 			name: "tag event with branch ref is denied",
 			rule: rule(config.RuleConfig{
-				Repo:   "sendico/sendico",
+				Repo:   "example/repo",
 				Events: []string{"tag"},
 				Tags:   []string{"v*"},
 			}),
@@ -130,7 +155,7 @@ func TestRuleMatching(t *testing.T) {
 		{
 			name: "release event may target tag ref",
 			rule: rule(config.RuleConfig{
-				Repo:   "sendico/sendico",
+				Repo:   "example/repo",
 				Events: []string{"release"},
 				Refs:   []string{"refs/tags/v*"},
 			}),
@@ -143,7 +168,7 @@ func TestRuleMatching(t *testing.T) {
 		{
 			name: "pull request denied by default",
 			rule: rule(config.RuleConfig{
-				Repo:   "sendico/sendico",
+				Repo:   "example/repo",
 				Events: []string{"pull_request"},
 			}),
 			req: woodpecker.Request{
@@ -155,7 +180,7 @@ func TestRuleMatching(t *testing.T) {
 		{
 			name: "pull request closed denied by default",
 			rule: rule(config.RuleConfig{
-				Repo:   "sendico/sendico",
+				Repo:   "example/repo",
 				Events: []string{"pull_request_closed"},
 			}),
 			req: woodpecker.Request{
@@ -167,7 +192,7 @@ func TestRuleMatching(t *testing.T) {
 		{
 			name: "future pull request event denied by default",
 			rule: rule(config.RuleConfig{
-				Repo:   "sendico/sendico",
+				Repo:   "example/repo",
 				Events: []string{"pull_request_future_variant"},
 			}),
 			req: woodpecker.Request{
@@ -179,17 +204,17 @@ func TestRuleMatching(t *testing.T) {
 		{
 			name: "allow forks alone does not allow pull request",
 			rule: rule(config.RuleConfig{
-				Repo:       "sendico/sendico",
+				Repo:       "example/repo",
 				Events:     []string{"pull_request"},
 				AllowForks: true,
 			}),
-			req:  mustDecode(t, `{"repo":{"namespace":"sendico","name":"sendico"},"pipeline":{"event":"pull_request","branch":"feature","ref":"refs/pull/1/head","from_fork":true}}`),
+			req:  mustDecode(t, `{"repo":{"namespace":"example","name":"repo"},"pipeline":{"event":"pull_request","branch":"feature","ref":"refs/pull/1/head","from_fork":true}}`),
 			want: false,
 		},
 		{
 			name: "unknown fork denied when only pull requests allowed",
 			rule: rule(config.RuleConfig{
-				Repo:              "sendico/sendico",
+				Repo:              "example/repo",
 				Events:            []string{"pull_request"},
 				AllowPullRequests: true,
 			}),
@@ -202,7 +227,7 @@ func TestRuleMatching(t *testing.T) {
 		{
 			name: "unknown fork allowed when pull requests and forks enabled",
 			rule: rule(config.RuleConfig{
-				Repo:              "sendico/sendico",
+				Repo:              "example/repo",
 				Events:            []string{"pull_request"},
 				AllowPullRequests: true,
 				AllowForks:        true,
@@ -216,32 +241,32 @@ func TestRuleMatching(t *testing.T) {
 		{
 			name: "fork denied",
 			rule: rule(config.RuleConfig{
-				Repo:              "sendico/sendico",
+				Repo:              "example/repo",
 				Events:            []string{"pull_request"},
 				AllowPullRequests: true,
 			}),
-			req:  mustDecode(t, `{"repo":{"namespace":"sendico","name":"sendico","fork":true},"pipeline":{"event":"pull_request","branch":"feature","ref":"refs/pull/1/head"}}`),
+			req:  mustDecode(t, `{"repo":{"namespace":"example","name":"repo","fork":true},"pipeline":{"event":"pull_request","branch":"feature","ref":"refs/pull/1/head"}}`),
 			want: false,
 		},
 		{
 			name: "contradictory fork signals are denied",
 			rule: rule(config.RuleConfig{
-				Repo:              "sendico/sendico",
+				Repo:              "example/repo",
 				Events:            []string{"pull_request"},
 				AllowPullRequests: true,
 			}),
-			req:  mustDecode(t, `{"repo":{"namespace":"sendico","name":"sendico","fork":true},"pipeline":{"event":"pull_request","branch":"feature","ref":"refs/pull/1/head","from_fork":false}}`),
+			req:  mustDecode(t, `{"repo":{"namespace":"example","name":"repo","fork":true},"pipeline":{"event":"pull_request","branch":"feature","ref":"refs/pull/1/head","from_fork":false}}`),
 			want: false,
 		},
 		{
 			name: "fork allowed when pull requests and forks enabled",
 			rule: rule(config.RuleConfig{
-				Repo:              "sendico/sendico",
+				Repo:              "example/repo",
 				Events:            []string{"pull_request"},
 				AllowPullRequests: true,
 				AllowForks:        true,
 			}),
-			req:  mustDecode(t, `{"repo":{"namespace":"sendico","name":"sendico"},"pipeline":{"event":"pull_request","branch":"feature","ref":"refs/pull/1/head","from_fork":true}}`),
+			req:  mustDecode(t, `{"repo":{"namespace":"example","name":"repo"},"pipeline":{"event":"pull_request","branch":"feature","ref":"refs/pull/1/head","from_fork":true}}`),
 			want: true,
 		},
 	}
@@ -284,7 +309,7 @@ func rule(in config.RuleConfig) config.RuleConfig {
 		in.ID = "r1"
 	}
 	if in.Repo == "" {
-		in.Repo = "sendico/sendico"
+		in.Repo = "example/repo"
 	}
 	if len(in.Secrets) == 0 {
 		in.Secrets = []config.SecretConfig{{Name: "TOKEN", Path: "p", Field: "f"}}

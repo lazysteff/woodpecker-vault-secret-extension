@@ -1,6 +1,7 @@
 package signature
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"crypto/x509"
 	"encoding/base64"
@@ -8,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/yaronf/httpsign"
 )
@@ -21,11 +21,15 @@ type Verifier struct {
 }
 
 func ParsePublicKey(raw []byte) (ed25519.PublicKey, error) {
-	trimmed := strings.TrimSpace(string(raw))
-	if trimmed == "" {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 {
 		return nil, errors.New("public key is empty")
 	}
-	if block, _ := pem.Decode([]byte(trimmed)); block != nil {
+	if block, rest := pem.Decode(trimmed); block != nil {
+		if !bytes.HasPrefix(trimmed, []byte("-----BEGIN PUBLIC KEY-----")) ||
+			block.Type != "PUBLIC KEY" || len(block.Headers) != 0 || len(bytes.TrimSpace(rest)) != 0 {
+			return nil, errors.New("public key PEM must contain exactly one PUBLIC KEY block")
+		}
 		key, err := x509.ParsePKIXPublicKey(block.Bytes)
 		if err != nil {
 			return nil, fmt.Errorf("parse PKIX public key: %w", err)
@@ -36,12 +40,12 @@ func ParsePublicKey(raw []byte) (ed25519.PublicKey, error) {
 		}
 		return pub, nil
 	}
-	decoded, err := base64.StdEncoding.DecodeString(trimmed)
+	decoded, err := base64.StdEncoding.DecodeString(string(trimmed))
 	if err == nil && len(decoded) == ed25519.PublicKeySize {
 		return ed25519.PublicKey(decoded), nil
 	}
 	if len(raw) == ed25519.PublicKeySize {
-		return ed25519.PublicKey(raw), nil
+		return ed25519.PublicKey(bytes.Clone(raw)), nil
 	}
 	return nil, errors.New("invalid Ed25519 public key format")
 }

@@ -2,6 +2,52 @@ package woodpecker
 
 import "testing"
 
+func TestRepoIdentityRequiresConsistentAliases(t *testing.T) {
+	tests := []struct {
+		name string
+		repo Repo
+		want string
+		ok   bool
+	}{
+		{
+			name: "current Woodpecker full name and owner",
+			repo: Repo{FullName: "Example/Repo", Owner: "example", Name: "repo"},
+			want: "example/repo",
+			ok:   true,
+		},
+		{
+			name: "current owner fallback",
+			repo: Repo{Owner: "Example", Name: "Repo"},
+			want: "example/repo",
+			ok:   true,
+		},
+		{
+			name: "legacy namespace fallback",
+			repo: Repo{Namespace: "Example", Name: "Repo"},
+			want: "example/repo",
+			ok:   true,
+		},
+		{
+			name: "conflicting aliases",
+			repo: Repo{FullName: "example/repo", Owner: "other", Name: "repo"},
+			ok:   false,
+		},
+		{
+			name: "missing identity",
+			repo: Repo{Name: "repo"},
+			ok:   false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := (Request{Repo: tt.repo}).RepoIdentity()
+			if got != tt.want || ok != tt.ok {
+				t.Fatalf("RepoIdentity()=(%q, %v), want (%q, %v)", got, ok, tt.want, tt.ok)
+			}
+		})
+	}
+}
+
 func TestIsPullRequest(t *testing.T) {
 	tests := []struct {
 		event string
@@ -36,6 +82,7 @@ func TestEventRefConsistent(t *testing.T) {
 		want   bool
 	}{
 		{name: "tag event and ref", event: "tag", ref: "refs/tags/v1.2.3", want: true},
+		{name: "tag event with empty tag name", event: "tag", ref: "refs/tags/", want: false},
 		{name: "push event and branch ref", event: "push", branch: "main", ref: "refs/heads/main", want: true},
 		{name: "push branch and ref disagree", event: "push", branch: "main", ref: "refs/heads/feature", want: false},
 		{name: "push missing branch", event: "push", ref: "refs/heads/main", want: false},
@@ -43,8 +90,12 @@ func TestEventRefConsistent(t *testing.T) {
 		{name: "tag event with branch ref", event: "tag", ref: "refs/heads/main", want: false},
 		{name: "push event with tag ref", event: "push", branch: "main", ref: "refs/tags/v1.2.3", want: false},
 		{name: "pull request with tag ref", event: "pull_request", ref: "refs/tags/v1.2.3", want: false},
+		{name: "pull request without ref", event: "pull_request", want: false},
 		{name: "tag event without ref", event: "tag", want: false},
+		{name: "missing event", want: false},
+		{name: "event with surrounding whitespace", event: " push ", branch: "main", ref: "refs/heads/main", want: false},
 		{name: "release event with tag ref", event: "release", ref: "refs/tags/v1.2.3", want: true},
+		{name: "release event with empty tag name", event: "release", ref: "refs/tags/", want: false},
 		{name: "manual event with tag ref", event: "manual", ref: "refs/tags/v1.2.3", want: true},
 	}
 	for _, tt := range tests {

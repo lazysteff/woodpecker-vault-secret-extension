@@ -1,5 +1,8 @@
 .git
 .github
+/config.yml
+/secrets/
+/.env
 deploy/compose/secrets
 deploy/compose/config.yml
 coverage.out

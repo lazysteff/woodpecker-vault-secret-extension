@@ -15,7 +15,7 @@ woodpecker:
     enabled: false
 
 vault:
-  address: "https://vault.sendico.io"
+  address: "https://vault.example.com"
   namespace: ""
   auth:
     method: "approle"
@@ -29,29 +29,21 @@ vault:
   token_renewal: true
 
 rules:
-  - id: "sendico-main-deploy"
-    repo: "sendico/sendico"
+  - id: "example-main-deploy"
+    repo: "example/repo"
     events: ["push"]
     branches: ["main"]
     allow_pull_requests: false
     allow_forks: false
     partial: false
     secrets:
-      - name: "VAULT_ADDR"
+      - name: "DEPLOY_TOKEN"
         path: "cicd/woodpecker/deploy"
-        field: "vault_addr"
-        events: ["push"]
-      - name: "VAULT_APP_ROLE"
-        path: "cicd/woodpecker/deploy"
-        field: "vault_app_role"
-        events: ["push"]
-      - name: "VAULT_SECRET_ID"
-        path: "cicd/woodpecker/deploy"
-        field: "vault_secret_id"
+        field: "deploy_token"
         events: ["push"]
 
-  - id: "sendico-release-deploy"
-    repo: "sendico/sendico"
+  - id: "example-release"
+    repo: "example/repo"
     events: ["tag"]
     refs: ["refs/tags/v*"]
     allow_pull_requests: false

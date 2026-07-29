@@ -116,17 +116,42 @@ func (s *Server) handleSecrets(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "configuration error")
 		return
 	}
-	response, readCount, err := s.resolveSecrets(r.Context(), refs)
+	resolveCtx, cancel := s.resolutionContext(r.Context(), start)
+	defer cancel()
+	response, readCount, err := s.resolveSecrets(resolveCtx, refs)
 	if err != nil {
 		status, code, msg := classifyResolveError(err)
 		s.log(requestID, status, req.RepoForLog(), req.Pipeline.Event, req.Pipeline.Branch, req.Pipeline.Ref, "matched", readCount, code, start)
 		writeError(w, status, msg)
 		return
 	}
+	payload, err := json.Marshal(woodpecker.Response{Secrets: response})
+	if err != nil {
+		s.log(requestID, http.StatusInternalServerError, req.RepoForLog(), req.Pipeline.Event, req.Pipeline.Branch, req.Pipeline.Ref, "matched", readCount, "response_encode_failed", start)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	payload = append(payload, '\n')
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(woodpecker.Response{Secrets: response})
+	if n, err := w.Write(payload); err != nil || n != len(payload) {
+		s.log(requestID, http.StatusOK, req.RepoForLog(), req.Pipeline.Event, req.Pipeline.Branch, req.Pipeline.Ref, "matched", readCount, "response_write_failed", start)
+		return
+	}
 	s.log(requestID, http.StatusOK, req.RepoForLog(), req.Pipeline.Event, req.Pipeline.Branch, req.Pipeline.Ref, "matched", readCount, "", start)
+}
+
+func (s *Server) resolutionContext(parent context.Context, requestStart time.Time) (context.Context, context.CancelFunc) {
+	timeout := s.cfg.WriteTimeout.Duration
+	if timeout <= 0 {
+		return context.WithCancel(parent)
+	}
+	// Reserve part of the server's write budget for encoding and delivering the response.
+	budget := timeout - timeout/10
+	if budget <= 0 {
+		budget = timeout
+	}
+	return context.WithDeadline(parent, requestStart.Add(budget))
 }
 
 func (s *Server) resolveSecrets(ctx context.Context, refs []rules.SecretRef) ([]woodpecker.Secret, int, error) {
@@ -168,7 +193,7 @@ var (
 )
 
 func classifyResolveError(err error) (int, string, string) {
-	if errors.Is(err, vault.ErrUnavailable) {
+	if errors.Is(err, vault.ErrUnavailable) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 		return http.StatusServiceUnavailable, "vault_read_failed", "vault read failed"
 	}
 	if errors.Is(err, errMissingField) {
@@ -198,8 +223,8 @@ func methodNotAllowed(w http.ResponseWriter, allow string) {
 }
 
 func requestID(r *http.Request) string {
-	for _, header := range []string{"X-Request-ID", "X-Request-Id", "Request-Id"} {
-		if v := r.Header.Get(header); v != "" {
+	for _, header := range []string{"X-Request-ID", "Request-ID"} {
+		if v := r.Header.Get(header); validRequestID(v) {
 			return v
 		}
 	}
@@ -208,6 +233,18 @@ func requestID(r *http.Request) string {
 		return "unknown"
 	}
 	return hex.EncodeToString(b[:])
+}
+
+func validRequestID(value string) bool {
+	if value == "" || len(value) > 128 {
+		return false
+	}
+	for i := range len(value) {
+		if value[i] < '!' || value[i] > '~' {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Server) log(requestID string, status int, repo, event, branch, ref, matchResult string, vaultReadCount int, errorCode string, start time.Time) {
@@ -236,6 +273,9 @@ func (s *Server) log(requestID string, status int, repo, event, branch, ref, mat
 	}
 	if errorCode != "" {
 		fields = append(fields, "error_code", errorCode)
+	}
+	if errorCode == "response_write_failed" {
+		fields = append(fields, "delivery_result", "failed")
 	}
 	s.logger.Info("request completed", fields...)
 }

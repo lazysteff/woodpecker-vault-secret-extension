@@ -72,7 +72,7 @@ func CollectSecretRefs(matches []Match) ([]SecretRef, error) {
 
 func matchRule(rule config.RuleConfig, req woodpecker.Request) bool {
 	repo, ok := req.RepoIdentity()
-	if !ok || repo != strings.ToLower(rule.Repo) {
+	if !ok || repo != strings.ToLower(strings.TrimSpace(rule.Repo)) {
 		return false
 	}
 	if !req.EventRefConsistent() {

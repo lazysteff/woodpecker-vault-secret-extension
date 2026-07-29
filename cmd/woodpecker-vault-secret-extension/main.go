@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,49 +18,42 @@ import (
 )
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	configFile := os.Getenv("CONFIG_FILE")
 	if configFile == "" {
 		configFile = "config.yml"
 	}
 	cfg, err := config.LoadFile(configFile)
 	if err != nil {
-		log.Fatalf("load config: %v", err)
+		log.Printf("load config: %v", err)
+		return 1
 	}
 	logger := logging.New(cfg.Logging)
 
 	pubMaterial, err := cfg.Woodpecker.PublicKeyMaterial()
 	if err != nil {
 		logger.Error("load woodpecker public key failed", "error_code", "woodpecker_public_key_failed")
-		os.Exit(1)
+		return 1
 	}
 	pubKey, err := signature.ParsePublicKey(pubMaterial)
 	if err != nil {
 		logger.Error("parse woodpecker public key failed", "error_code", "woodpecker_public_key_failed")
-		os.Exit(1)
+		return 1
 	}
 	verifier, err := signature.NewVerifier(pubKey, cfg.Server.MaxBodyBytes)
 	if err != nil {
 		logger.Error("initialize signature verifier failed", "error_code", "signature_verifier_failed")
-		os.Exit(1)
+		return 1
 	}
 
 	vaultClient, err := vault.New(cfg.Vault)
 	if err != nil {
 		logger.Error("initialize vault client failed", "error_code", "vault_client_failed")
-		os.Exit(1)
+		return 1
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	authCtx, cancel := context.WithTimeout(ctx, cfg.Vault.RequestTimeout.Duration)
-	if err := vaultClient.Authenticate(authCtx); err != nil {
-		cancel()
-		logger.Error("vault authentication failed", "error_code", "vault_auth_failed")
-		os.Exit(1)
-	}
-	cancel()
-	vaultClient.StartRenewal(ctx, logger)
-	defer vaultClient.Close()
-
 	app := httpserver.New(cfg.Server, cfg.Rules, verifier, vaultClient, logger)
 	server := &http.Server{
 		Addr:         cfg.Server.ListenAddr,
@@ -69,15 +62,33 @@ func main() {
 		WriteTimeout: cfg.Server.WriteTimeout.Duration,
 		IdleTimeout:  cfg.Server.IdleTimeout.Duration,
 	}
-	go func() {
-		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		_ = server.Shutdown(shutdownCtx)
-	}()
-	logger.Info("starting server", "listen_addr", cfg.Server.ListenAddr)
-	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	listener, err := net.Listen("tcp", server.Addr)
+	if err != nil {
 		logger.Error("server failed", "error_code", "server_failed")
-		os.Exit(1)
+		return 1
 	}
+	// Serve closes the listener after startup succeeds; this also closes it on
+	// every authentication or initialization failure before Serve takes over.
+	defer listener.Close()
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	authCtx, cancel := context.WithTimeout(ctx, cfg.Vault.RequestTimeout.Duration)
+	if err := vaultClient.Authenticate(authCtx); err != nil {
+		cancel()
+		logger.Error("vault authentication failed", "error_code", "vault_auth_failed")
+		return 1
+	}
+	cancel()
+	// Renewal belongs to the server lifecycle, not the signal lifecycle: active
+	// requests may still need the current token while graceful shutdown drains.
+	vaultClient.StartRenewal(context.Background(), logger)
+	defer vaultClient.Close()
+
+	logger.Info("starting server", "listen_addr", cfg.Server.ListenAddr)
+	if err := serveHTTP(ctx, server, listener, 10*time.Second); err != nil {
+		logger.Error("server failed", "error_code", "server_failed")
+		return 1
+	}
+	return 0
 }

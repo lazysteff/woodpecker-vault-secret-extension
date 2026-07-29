@@ -3,5 +3,8 @@ bin/
 dist/
 coverage.out
 *.test
+/config.yml
+/secrets/
+/.env
 deploy/compose/secrets/
 deploy/compose/config.yml

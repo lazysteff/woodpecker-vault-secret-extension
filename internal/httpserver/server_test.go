@@ -42,7 +42,7 @@ func TestSecretsEndpoint(t *testing.T) {
 	srv := New(testServerConfig(), []config.RuleConfig{
 		{
 			ID:       "main",
-			Repo:     "sendico/sendico",
+			Repo:     "example/repo",
 			Events:   []string{"push"},
 			Branches: []string{"main"},
 			Secrets: []config.SecretConfig{
@@ -52,7 +52,7 @@ func TestSecretsEndpoint(t *testing.T) {
 			},
 		},
 	}, verifier, store, slog.New(slog.NewTextHandler(io.Discard, nil))).Handler()
-	body := []byte(`{"repo":{"namespace":"sendico","name":"sendico"},"pipeline":{"event":"push","branch":"main","ref":"refs/heads/main","refspec":""}}`)
+	body := []byte(`{"repo":{"namespace":"example","name":"repo"},"pipeline":{"event":"push","branch":"main","ref":"refs/heads/main","refspec":""}}`)
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, signedRequest(t, priv, body))
 	if rec.Code != http.StatusOK {
@@ -78,12 +78,12 @@ func TestSecretsEndpointFailures(t *testing.T) {
 	}
 	baseRules := []config.RuleConfig{{
 		ID:       "main",
-		Repo:     "sendico/sendico",
+		Repo:     "example/repo",
 		Events:   []string{"push"},
 		Branches: []string{"main"},
 		Secrets:  []config.SecretConfig{{Name: "VAULT_ADDR", Path: "p", Field: "vault_addr"}},
 	}}
-	body := []byte(`{"repo":{"namespace":"sendico","name":"sendico"},"pipeline":{"event":"push","branch":"main","ref":"refs/heads/main"}}`)
+	body := []byte(`{"repo":{"namespace":"example","name":"repo"},"pipeline":{"event":"push","branch":"main","ref":"refs/heads/main"}}`)
 	tests := []struct {
 		name        string
 		store       *fakeStore
@@ -142,10 +142,22 @@ func TestSecretsEndpointFailures(t *testing.T) {
 			want:  http.StatusNoContent,
 		},
 		{
+			name:  "missing pipeline event",
+			store: &fakeStore{data: map[string]map[string]any{"p": {"vault_addr": "x"}}},
+			rules: []config.RuleConfig{{
+				ID:      "broad",
+				Repo:    "example/repo",
+				Secrets: []config.SecretConfig{{Name: "VAULT_ADDR", Path: "p", Field: "vault_addr"}},
+			}},
+			req:         signedRequest(t, priv, []byte(`{"repo":{"namespace":"example","name":"repo"},"pipeline":{"branch":"main","ref":"refs/heads/main"}}`)),
+			want:        http.StatusNoContent,
+			wantNoVault: true,
+		},
+		{
 			name:        "inconsistent event and ref",
 			store:       &fakeStore{data: map[string]map[string]any{"p": {"vault_addr": "x"}}},
 			rules:       baseRules,
-			req:         signedRequest(t, priv, []byte(`{"repo":{"namespace":"sendico","name":"sendico"},"pipeline":{"event":"push","branch":"main","ref":"refs/tags/v1.2.3"}}`)),
+			req:         signedRequest(t, priv, []byte(`{"repo":{"namespace":"example","name":"repo"},"pipeline":{"event":"push","branch":"main","ref":"refs/tags/v1.2.3"}}`)),
 			want:        http.StatusNoContent,
 			wantNoVault: true,
 		},
@@ -153,7 +165,7 @@ func TestSecretsEndpointFailures(t *testing.T) {
 			name:        "inconsistent push branch and ref",
 			store:       &fakeStore{data: map[string]map[string]any{"p": {"vault_addr": "x"}}},
 			rules:       baseRules,
-			req:         signedRequest(t, priv, []byte(`{"repo":{"namespace":"sendico","name":"sendico"},"pipeline":{"event":"push","branch":"main","ref":"refs/heads/feature"}}`)),
+			req:         signedRequest(t, priv, []byte(`{"repo":{"namespace":"example","name":"repo"},"pipeline":{"event":"push","branch":"main","ref":"refs/heads/feature"}}`)),
 			want:        http.StatusNoContent,
 			wantNoVault: true,
 		},
@@ -162,12 +174,12 @@ func TestSecretsEndpointFailures(t *testing.T) {
 			store: &fakeStore{data: map[string]map[string]any{"p": {"vault_addr": "x"}}},
 			rules: []config.RuleConfig{{
 				ID:                "pull-request",
-				Repo:              "sendico/sendico",
+				Repo:              "example/repo",
 				Events:            []string{"pull_request"},
 				AllowPullRequests: true,
 				Secrets:           []config.SecretConfig{{Name: "VAULT_ADDR", Path: "p", Field: "vault_addr"}},
 			}},
-			req:         signedRequest(t, priv, []byte(`{"repo":{"namespace":"sendico","name":"sendico","fork":true},"pipeline":{"event":"pull_request","branch":"feature","ref":"refs/pull/1/head","from_fork":false}}`)),
+			req:         signedRequest(t, priv, []byte(`{"repo":{"namespace":"example","name":"repo","fork":true},"pipeline":{"event":"pull_request","branch":"feature","ref":"refs/pull/1/head","from_fork":false}}`)),
 			want:        http.StatusNoContent,
 			wantNoVault: true,
 		},
@@ -249,6 +261,49 @@ func TestWrongMethodAndProbes(t *testing.T) {
 	}
 }
 
+func TestRequestIDAcceptsOnlyBoundedVisibleValues(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		keep  bool
+	}{
+		{name: "trace ID", value: "trace-1234", keep: true},
+		{name: "maximum length", value: strings.Repeat("a", 128), keep: true},
+		{name: "too long", value: strings.Repeat("a", 129)},
+		{name: "contains whitespace", value: "trace 1234"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "http://example.test/secrets", nil)
+			req.Header.Set("X-Request-ID", tt.value)
+			got := requestID(req)
+			if tt.keep && got != tt.value {
+				t.Fatalf("requestID=%q, want %q", got, tt.value)
+			}
+			if !tt.keep && (got == tt.value || len(got) != 16) {
+				t.Fatalf("invalid request ID was not replaced: %q", got)
+			}
+		})
+	}
+}
+
+func TestResolutionDeadlineIsAnchoredToRequestStart(t *testing.T) {
+	const writeTimeout = 2 * time.Second
+	server := &Server{cfg: config.ServerConfig{WriteTimeout: config.Duration{Duration: writeTimeout}}}
+	requestStart := time.Now().Add(-time.Second)
+	ctx, cancel := server.resolutionContext(context.Background(), requestStart)
+	defer cancel()
+
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		t.Fatal("resolution context has no deadline")
+	}
+	want := requestStart.Add(writeTimeout - writeTimeout/10)
+	if delta := deadline.Sub(want); delta < -time.Millisecond || delta > time.Millisecond {
+		t.Fatalf("deadline=%v, want %v", deadline, want)
+	}
+}
+
 func TestSignedRequestWithFakeVaultClient(t *testing.T) {
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -273,13 +328,13 @@ func TestSignedRequestWithFakeVaultClient(t *testing.T) {
 	}
 	handler := New(testServerConfig(), []config.RuleConfig{{
 		ID:       "main",
-		Repo:     "sendico/sendico",
+		Repo:     "example/repo",
 		Events:   []string{"push"},
 		Branches: []string{"main"},
 		Secrets:  []config.SecretConfig{{Name: "VAULT_ADDR", Path: "cicd/woodpecker/deploy", Field: "vault_addr"}},
 	}}, verifier, client, slog.New(slog.NewTextHandler(io.Discard, nil))).Handler()
 
-	body := []byte(`{"repo":{"namespace":"sendico","name":"sendico"},"pipeline":{"event":"push","branch":"main","ref":"refs/heads/main"}}`)
+	body := []byte(`{"repo":{"namespace":"example","name":"repo"},"pipeline":{"event":"push","branch":"main","ref":"refs/heads/main"}}`)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, signedRequest(t, priv, body))
 	if rec.Code != http.StatusOK {
@@ -345,16 +400,18 @@ func advisorySignatureRequest(t *testing.T, body []byte) *http.Request {
 func testServerConfig() config.ServerConfig {
 	return config.ServerConfig{
 		ReadTimeout:  config.Duration{Duration: time.Second},
+		WriteTimeout: config.Duration{Duration: 2 * time.Second},
 		MaxBodyBytes: 1 << 20,
 	}
 }
 
 type fakeStore struct {
-	data       map[string]map[string]any
-	err        error
-	readyErr   error
-	readyCalls int
-	reads      map[string]int
+	data           map[string]map[string]any
+	err            error
+	readyErr       error
+	waitForContext bool
+	readyCalls     int
+	reads          map[string]int
 }
 
 type httpFakeVault struct {
@@ -365,6 +422,13 @@ type httpFakeVault struct {
 func newHTTPFakeVault() *httpFakeVault {
 	fv := &httpFakeVault{}
 	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/auth/token/lookup-self", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Vault-Token") != "good-token" {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"num_uses": 0}})
+	})
 	mux.HandleFunc("/v1/kv/data/cicd/woodpecker/deploy", func(w http.ResponseWriter, r *http.Request) {
 		fv.reads++
 		if r.Header.Get("X-Vault-Token") != "good-token" {
@@ -386,11 +450,15 @@ func (f *fakeStore) Ready(context.Context) error {
 	return f.readyErr
 }
 
-func (f *fakeStore) ReadKV(_ context.Context, path string) (map[string]any, error) {
+func (f *fakeStore) ReadKV(ctx context.Context, path string) (map[string]any, error) {
 	if f.reads == nil {
 		f.reads = map[string]int{}
 	}
 	f.reads[path]++
+	if f.waitForContext {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
 	if f.err != nil {
 		return nil, f.err
 	}

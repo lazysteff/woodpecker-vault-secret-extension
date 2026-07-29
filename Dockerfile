@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.25-alpine AS build
+FROM golang:alpine AS build
 WORKDIR /src
 
 RUN apk add --no-cache ca-certificates
@@ -8,10 +8,11 @@ RUN apk add --no-cache ca-certificates
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY . .
+COPY cmd ./cmd
+COPY internal ./internal
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/woodpecker-vault-secret-extension ./cmd/woodpecker-vault-secret-extension
 
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static:nonroot
 
 LABEL org.opencontainers.image.title="woodpecker-vault-secret-extension" \
       org.opencontainers.image.description="Woodpecker CI secret extension backed by HashiCorp Vault or OpenBao KV v2" \

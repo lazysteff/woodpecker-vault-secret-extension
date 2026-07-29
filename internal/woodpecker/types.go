@@ -18,6 +18,7 @@ type Request struct {
 type Repo struct {
 	FullName  string `json:"full_name"`
 	Slug      string `json:"slug"`
+	Owner     string `json:"owner"`
 	Namespace string `json:"namespace"`
 	Name      string `json:"name"`
 }
@@ -64,16 +65,31 @@ func Decode(b []byte) (*Request, error) {
 }
 
 func (r Request) RepoIdentity() (string, bool) {
-	if r.Repo.FullName != "" {
-		return strings.ToLower(r.Repo.FullName), true
+	candidates := make([]string, 0, 4)
+	for _, value := range []string{r.Repo.FullName, r.Repo.Slug} {
+		if value = normalizeRepoIdentity(value); value != "" {
+			candidates = append(candidates, value)
+		}
 	}
-	if r.Repo.Slug != "" {
-		return strings.ToLower(r.Repo.Slug), true
+	for _, owner := range []string{r.Repo.Owner, r.Repo.Namespace} {
+		if owner = strings.TrimSpace(owner); owner != "" && strings.TrimSpace(r.Repo.Name) != "" {
+			candidates = append(candidates, normalizeRepoIdentity(owner+"/"+r.Repo.Name))
+		}
 	}
-	if r.Repo.Namespace != "" && r.Repo.Name != "" {
-		return strings.ToLower(r.Repo.Namespace + "/" + r.Repo.Name), true
+	if len(candidates) == 0 {
+		return "", false
 	}
-	return "", false
+	identity := candidates[0]
+	for _, candidate := range candidates[1:] {
+		if candidate != identity {
+			return "", false
+		}
+	}
+	return identity, true
+}
+
+func normalizeRepoIdentity(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
 }
 
 func (r Request) RepoForLog() string {
@@ -93,7 +109,14 @@ func (r Request) IsTag() bool {
 }
 
 func (r Request) EventRefConsistent() bool {
-	tagRef := strings.HasPrefix(r.Pipeline.Ref, "refs/tags/")
+	if r.Pipeline.Event == "" || r.Pipeline.Event != strings.TrimSpace(r.Pipeline.Event) {
+		return false
+	}
+	const tagRefPrefix = "refs/tags/"
+	if r.Pipeline.Ref == tagRefPrefix {
+		return false
+	}
+	tagRef := strings.HasPrefix(r.Pipeline.Ref, tagRefPrefix)
 	if r.IsTag() {
 		return tagRef
 	}
@@ -104,7 +127,7 @@ func (r Request) EventRefConsistent() bool {
 			strings.TrimPrefix(r.Pipeline.Ref, branchRefPrefix) == r.Pipeline.Branch
 	}
 	if r.IsPullRequest() {
-		return !tagRef
+		return r.Pipeline.Ref != "" && !tagRef
 	}
 	return true
 }

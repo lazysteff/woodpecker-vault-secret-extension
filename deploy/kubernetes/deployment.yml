@@ -71,6 +71,7 @@ spec:
       labels:
         app: woodpecker-vault-secret-extension
     spec:
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         seccompProfile:
@@ -78,7 +79,7 @@ spec:
       containers:
         - name: woodpecker-vault-secret-extension
           image: woodpecker-vault-secret-extension:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           env:
             - name: CONFIG_FILE
               value: /config/config.yml
