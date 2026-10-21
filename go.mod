@@ -1,6 +1,6 @@
 module github.com/lazysteff/woodpecker-vault-secret-extension
 
-go 1.27.0
+go 1.27.3
 
 require (
 	github.com/yaronf/httpsign v0.6.2
