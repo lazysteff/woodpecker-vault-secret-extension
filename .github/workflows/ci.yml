@@ -11,15 +11,16 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
       - run: go mod verify
       - run: go mod tidy -diff
-      - run: go test -race ./...
+      - run: go test -race -count=1 ./...
       - run: go vet ./...
       - run: go install golang.org/x/vuln/cmd/govulncheck@latest
       - run: govulncheck ./...
+      - run: docker compose -f deploy/compose/compose.yml config
       - run: docker build -t woodpecker-vault-secret-extension:ci .

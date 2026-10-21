@@ -4,6 +4,9 @@
 
 It is not a generic Vault proxy. A request can receive a secret only when the Woodpecker HTTP signature is valid, the repository and pipeline context match a static allowlist rule, PR/fork policy allows the request, the Vault path is statically configured, and every configured field resolves to a string.
 
+For a complete least-privilege setup, deployment, verification, and rollback
+walkthrough, see [How to use the extension](docs/how-to-use.md).
+
 ## Features
 
 - `POST /secrets` Woodpecker secret extension endpoint
@@ -236,16 +239,18 @@ Error bodies are non-sensitive and do not include secret values, Vault paths, to
 ## Docker
 
 ```bash
-docker build -t woodpecker-vault-secret-extension .
+docker build --pull -t woodpecker-vault-secret-extension:latest .
 
 docker run --rm -p 8080:8080 \
   -e CONFIG_FILE=/config/config.yml \
   -v "$PWD/examples/config.yml:/config/config.yml:ro" \
-  -v "$PWD/secrets:/run/secrets:ro" \
-  woodpecker-vault-secret-extension
+  -v "$PWD/secrets/woodpecker_extension_public_key:/run/secrets/woodpecker_extension_public_key:ro" \
+  -v "$PWD/secrets/vault_role_id:/run/secrets/vault_role_id:ro" \
+  -v "$PWD/secrets/vault_secret_id:/run/secrets/vault_secret_id:ro" \
+  woodpecker-vault-secret-extension:latest
 ```
 
-The image runs as non-root, uses the latest minimal distroless runtime image, exposes port `8080`, and does not bake secrets into the image. The build copies only Go source and module metadata, while local root `config.yml`, `.env`, and `secrets/` inputs are excluded from both Git and the Docker build context. Container bases and deployment images intentionally track their moving latest references; deployments must always pull before starting a container.
+Prepare the configuration and mode-`0444` credential files as described in the [how-to](docs/how-to-use.md). The project publishes source releases rather than a public container image. The image runs as non-root, uses the latest minimal distroless runtime image, exposes port `8080`, and does not bake secrets into the image. The build copies only Go source and module metadata, while local root `config.yml`, `.env`, and `secrets/` inputs are excluded from both Git and the Docker build context. Container bases intentionally track their moving latest references, so use `--pull` for release builds.
 
 ## Development
 

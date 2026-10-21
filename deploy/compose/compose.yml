@@ -1,13 +1,19 @@
 services:
   woodpecker-vault-secret-extension:
     image: woodpecker-vault-secret-extension:latest
-    pull_policy: always
+    build:
+      context: ../..
+      pull: true
+    pull_policy: build
     restart: unless-stopped
     environment:
       CONFIG_FILE: /config/config.yml
     volumes:
       - ./config.yml:/config/config.yml:ro
-      - ./secrets:/run/secrets:ro
+    secrets:
+      - woodpecker_extension_public_key
+      - vault_role_id
+      - vault_secret_id
     ports:
       - "127.0.0.1:8080:8080"
     read_only: true
@@ -15,3 +21,15 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+
+networks:
+  default:
+    name: woodpecker-extensions
+
+secrets:
+  woodpecker_extension_public_key:
+    file: ./secrets/woodpecker_extension_public_key
+  vault_role_id:
+    file: ./secrets/vault_role_id
+  vault_secret_id:
+    file: ./secrets/vault_secret_id

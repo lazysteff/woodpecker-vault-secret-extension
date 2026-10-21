@@ -44,19 +44,6 @@ data:
             field: "vault_addr"
             events: ["push"]
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: woodpecker-vault-secret-extension-secrets
-type: Opaque
-stringData:
-  woodpecker_extension_public_key: |
-    -----BEGIN PUBLIC KEY-----
-    replace-with-woodpecker-extension-public-key
-    -----END PUBLIC KEY-----
-  vault_role_id: "replace-with-role-id"
-  vault_secret_id: "replace-with-secret-id"
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -78,7 +65,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: woodpecker-vault-secret-extension
-          image: woodpecker-vault-secret-extension:latest
+          image: replace-with-your-registry/woodpecker-vault-secret-extension:latest
           imagePullPolicy: Always
           env:
             - name: CONFIG_FILE

@@ -1,0 +1,69 @@
+server:
+  listen_addr: ":8080"
+  read_timeout: "5s"
+  write_timeout: "10s"
+  idle_timeout: "60s"
+  max_body_bytes: 1048576
+
+logging:
+  level: "info"
+  format: "json"
+
+woodpecker:
+  public_key_file: "/run/secrets/woodpecker_extension_public_key"
+  netrc:
+    enabled: false
+
+vault:
+  address: "https://vault.example.com"
+  namespace: ""
+  auth:
+    method: "approle"
+    mount_path: "approle"
+    role_id_file: "/run/secrets/vault_role_id"
+    secret_id_file: "/run/secrets/vault_secret_id"
+  kv:
+    version: 2
+    mount: "kv"
+  request_timeout: "5s"
+  token_renewal: true
+
+rules:
+  - id: "example-main"
+    repo: "example/repo"
+    events: ["push"]
+    branches: ["main"]
+    allow_pull_requests: false
+    allow_forks: false
+    partial: false
+    secrets:
+      - name: "DEPLOY_TOKEN"
+        path: "cicd/woodpecker/deploy"
+        field: "deploy_token"
+        events: ["push"]
+
+  - id: "example-release"
+    repo: "example/repo"
+    events: ["tag"]
+    refs: ["refs/tags/v*"]
+    allow_pull_requests: false
+    allow_forks: false
+    partial: false
+    secrets:
+      - name: "RELEASE_TOKEN"
+        path: "cicd/woodpecker/release"
+        field: "release_token"
+        events: ["tag"]
+
+  - id: "example-infrastructure-release"
+    repo: "example/repo"
+    events: ["tag"]
+    refs: ["refs/tags/infra-v*"]
+    allow_pull_requests: false
+    allow_forks: false
+    partial: false
+    secrets:
+      - name: "INFRA_TOKEN"
+        path: "cicd/woodpecker/infra-release"
+        field: "infra_token"
+        events: ["tag"]
