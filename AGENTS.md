@@ -13,6 +13,7 @@ These guidelines apply to the entire
 - Keep changes within the requested feature and contract boundaries. Newly
   discovered work that is not required for the requested outcome should be
   reported as follow-up work rather than silently expanding scope.
+- Never commit generated code. Generate it from the schema source at build time.
 
 ## Dependency policy
 
